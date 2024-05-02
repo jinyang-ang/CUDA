@@ -1,0 +1,2 @@
+device,driverversion,duration (ms),frames,fps
+Intel(R) UHD Graphics,1647765,1004.1056,235,234.0391

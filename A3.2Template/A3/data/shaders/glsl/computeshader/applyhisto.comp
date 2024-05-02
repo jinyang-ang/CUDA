@@ -1,0 +1,59 @@
+/* Start Header *****************************************************************/
+
+/*! \file applyhisto.comp
+
+    \author Ang Jin Yang, jinyang.ang 2000940
+
+    \par email : jinyang.ang.digipen.edu
+
+    \date 23/3/2024
+
+    \brief Copyright (C) 2024 DigiPen Institute of Technology.
+
+Reproduction or disclosure of this file or its contents without
+the prior written consent of DigiPen Institute of Technology is prohibited. */
+
+/* End Header *******************************************************************/
+
+#version 450
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0, rgba8) uniform  image2D inImage;
+layout(binding = 1, rgba8) uniform  image2D outImage;
+layout(binding = 2) buffer HistogramBuffer {
+    uint histoBin[256];
+    float cdf[256];
+} histoEqBuffer;
+
+shared float cdf_private[256];
+
+void main() {
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 imageSize = imageSize(inImage);
+
+    if (pixelCoord.x < imageSize.x && pixelCoord.y < imageSize.y) {
+
+        uint tid = gl_LocalInvocationIndex;
+        cdf_private[tid] = histoEqBuffer.cdf[tid];
+        barrier();
+        vec4 pixel = imageLoad(inImage, pixelCoord);
+        float Y = 0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
+        float U = clamp((-0.169 * pixel.r + -0.331 * pixel.g + 0.499 * pixel.b) + 128.0,0.0,255.0);
+        float V = clamp((0.499 * pixel.r + -0.418 * pixel.g + -0.0813 * pixel.b) + 128.0,0.0,255.0);
+
+        float cdfVal = cdf_private[uint(clamp(Y * 255.0, 0, 255))];
+        float cdfMin = cdf_private[0];
+
+        // no need *255.0 & clamp 255.0 since original is alr in [0,1.0] range...
+        float Y_prime = clamp((cdfVal - cdfMin) / (1.0 - cdfMin), 0.0, 1.0);
+
+        vec3 Y_primeUV = vec3(Y_prime, U-128, V-128);
+
+        vec3 rgb = vec3(Y_primeUV.r + 1.402 * Y_primeUV.b,
+                        Y_primeUV.r - 0.344 * Y_primeUV.g - 0.714 * Y_primeUV.b,
+                        Y_primeUV.r + 1.772 * Y_primeUV.g);
+
+        imageStore(outImage, ivec2(gl_GlobalInvocationID.xy), vec4(rgb, 1.0));
+    }
+}

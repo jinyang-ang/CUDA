@@ -1,0 +1,61 @@
+/* Start Header *****************************************************************/
+
+/*! \file cdfscan.comp
+
+    \author Ang Jin Yang, jinyang.ang 2000940
+
+    \par email : jinyang.ang.digipen.edu
+
+    \date 23/3/2024
+
+    \brief Copyright (C) 2024 DigiPen Institute of Technology.
+
+Reproduction or disclosure of this file or its contents without
+the prior written consent of DigiPen Institute of Technology is prohibited. */
+
+/* End Header *******************************************************************/
+
+#version 450
+
+layout (local_size_x = 16, local_size_y = 16) in;
+layout(binding = 0, rgba8) uniform readonly image2D inImage;
+
+layout(binding = 2) buffer HistogramBuffer {
+    uint histoBin[256];
+    float cdf[256];
+} histoEqBuffer;
+
+shared uint histo_private[256];
+#define PROB(x, width, height) (float(x) / float(width * height))
+
+void main() {
+
+    uint tid = gl_LocalInvocationIndex;
+    histo_private[tid] = histoEqBuffer.histoBin[tid];
+    barrier();
+
+    // from notes reduction phase...
+    for (uint stride = 1; stride <= 256; stride *= 2) 
+    {
+        uint index = (tid+1) * stride * 2 - 1;
+        if ( index < 256)
+            histo_private[index] += histo_private[index - stride];
+        barrier();
+    }
+
+    // from notes post reduction phase...
+    for (uint stride = 256/2; stride > 0; stride /= 2) 
+    {
+        barrier();
+        uint index = (tid + 1) * stride * 2 - 1;
+        if( index + stride < 256) 
+        {
+            histo_private[index + stride] += histo_private[index];
+        }
+    }
+
+    barrier();
+   
+    histoEqBuffer.cdf[tid] = PROB(histo_private[tid], imageSize(inImage).x, imageSize(inImage).y);
+   
+}

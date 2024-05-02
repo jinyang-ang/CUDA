@@ -1,0 +1,7 @@
+﻿  main.cpp
+  Generating code
+  127 of 5191 functions ( 2.4%) were compiled, the rest were copied from previous compilation.
+    21 functions were new in current compilation
+    45 functions had inline decision re-evaluated but remain unchanged
+  Finished generating code
+  A3.vcxproj -> C:\Users\jinya\Desktop\School\Year3\SEM4\CUDA\A4\A3\x64\Release\A3.exe

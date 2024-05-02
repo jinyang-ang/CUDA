@@ -1,0 +1,49 @@
+/* Start Header *****************************************************************/
+
+/*! \file histogram.comp
+
+    \author Ang Jin Yang, jinyang.ang 2000940
+
+    \par email : jinyang.ang.digipen.edu
+
+    \date 23/3/2024
+
+    \brief Copyright (C) 2024 DigiPen Institute of Technology.
+
+Reproduction or disclosure of this file or its contents without
+the prior written consent of DigiPen Institute of Technology is prohibited. */
+
+/* End Header *******************************************************************/
+
+#version 450
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0, rgba8) uniform readonly image2D inImage;
+
+layout(binding = 2) buffer HistogramBuffer {
+    uint histoBin[256];
+    float cdf[256];
+} histoEqBuffer;
+
+shared uint histo_private[256];
+
+void main() {
+    uint lid = gl_LocalInvocationIndex;
+    histo_private[lid] = 0;
+    barrier();
+
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 imageSize = imageSize(inImage);
+
+    // Check if the pixel coordinate is within the image dimensions
+    if (pixelCoord.x < imageSize.x && pixelCoord.y < imageSize.y) {
+        vec4 pixel = imageLoad(inImage, pixelCoord);
+        float Y = 0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
+        atomicAdd(histo_private[uint(clamp(Y * 255.0, 0, 255))], 1);
+        barrier();
+        atomicAdd(histoEqBuffer.histoBin[lid], histo_private[lid]);
+    }
+
+   
+}
